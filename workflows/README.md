@@ -92,3 +92,42 @@ It refuses discrepancies greater than the specified numerical tolerance.
 Historical source scripts are intentionally unchanged in this first extraction;
 their outputs provide the regression ground truth. We will only replace their
 internal duplicated calculations once the real-data check passes.
+
+
+## Phase 7 and Phase 8 scientific replays (provenance-safe refactor)
+
+The original generating scripts, including `src/phase7/audit_07h_...` and
+`src/phase8/audit_08g_...`, are intentionally **not modified**: their
+archived outputs include script SHA256 provenance. We instead expose shared
+science in `cfstate/imodulons.py`, and verify its behaviour against frozen
+outputs using the following read-only replays:
+
+```bash
+# Always run from repository root in CFSTATE_ENV
+OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m unittest discover -s tests -v
+OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python workflows/projection_regression.py --check
+OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python workflows/followup_regression.py --check
+OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python workflows/metal_axis_regression.py --check
+```
+
+- `followup_regression.py` independently replays the frozen **07h** two
+  patients × two specimens × three CFBE references (12 comparisons) and the
+  two within-patient temporal differences. Uses the new shared
+  `project_residual` and `counts_to_logtpm` functions.
+- `metal_axis_regression.py` independently reconstructs the **08g** mean
+  combined Zn+Fe+Mn response direction from the 17 paired public
+  PAO1-spike-in sputum environments. It **imports only the original 08e2
+  input-parsing helpers**, not its main or any output-writing pipeline, and
+  uses the new shared `project_residual` function. Run it from the project
+  root so the original helpers resolve their paths correctly.
+- `tests/test_legacy_source_hashes.py` checks all 249 original generating
+  scripts against the hashes captured in `docs/CODE_INDEX.csv`.
+  Any historical source change must be treated as an explicit, separately
+  versioned provenance decision rather than a silent refactor.
+
+The scripts will **fail closed** if dimensions, required inputs, frozen QC
+status, sample identities, or numerical results disagree (tolerance
+`atol=1e-7`, `rtol=1e-9`). Do not execute a legacy generating audit to
+fix a missing file or a failing replay. Instead inspect the diagnosis and
+the upstream provenance. Successful numerical reproduction is not biological
+validation or evidence of CF-specific bacterial state.
