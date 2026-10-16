@@ -6,12 +6,10 @@ No historical audit is imported or executed. No scientific result is recomputed.
 """
 from __future__ import annotations
 
-import argparse
-import json
 import tempfile
 from pathlib import Path
 
-from _frozen import Stage, check_stages, validate_definition as validate_stages
+from _frozen import Stage, check_stages, run_cli, validate_definition as validate_stages
 
 
 P4 = 'results/phase4/'
@@ -107,41 +105,12 @@ def self_test() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument('--show', action='store_true', help='Show ordered stages without touching data')
-    parser.add_argument('--check', action='store_true', help='Check source and frozen assets (default)')
-    parser.add_argument('--include-optional', action='store_true', help='Include follow-up clinical stage')
-    parser.add_argument('--hash', action='store_true', help='Also compute SHA256 for checked files')
-    parser.add_argument('--json', action='store_true', help='Print machine-readable JSON instead of table')
-    parser.add_argument('--self-test', action='store_true')
-    args = parser.parse_args()
-    if args.self_test:
-        self_test()
-        return 0
-    if args.show:
-        for i, stage in enumerate(STAGES, 1):
-            optional = ' (optional)' if stage.optional else ''
-            print(f'{i:02d}. {stage.key}: {stage.name}{optional}')
-            print(f'    source: {stage.script}')
-            print(f'    depends: {", ".join(stage.depends) or "none"}')
-        return 0
-    results = check(args.root.resolve(), args.include_optional, args.hash)
-    if args.json:
-        print(json.dumps({'root': str(args.root.resolve()), 'stages': results}, indent=2))
-    else:
-        print('CF-STATE | CLINICAL FROZEN WORKFLOW CHECK (READ ONLY)')
-        print('Root:', args.root.resolve())
-        for row in results:
-            label = 'PASS' if row['ok'] else 'FAIL'
-            print(f'[{label}] {row["key"]}: {row["name"]}')
-            for issue in row['issues']:
-                print('       -', issue)
-        total = sum(x['ok'] for x in results)
-        print(f'Checked stages: {total}/{len(results)} PASS')
-        print('File/status checks do not prove biological validity or cohort independence.')
-        print('No existing data, frozen results or legacy scripts were changed.')
-    return 0 if all(row['ok'] for row in results) else 1
+    return run_cli(
+        STAGES,
+        'CF-STATE | CLINICAL FROZEN WORKFLOW CHECK (READ ONLY)',
+        'File/status checks do not prove biological validity or cohort independence.',
+        self_test=self_test,
+    )
 
 
 if __name__ == '__main__':
