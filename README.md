@@ -6,6 +6,21 @@
 
 Which interpretable transcriptional programmes are reliably observable in direct clinical CF airway bacterial transcriptomes, how reproducible are they across independent patients/cohorts, and what do controlled perturbations tell us about their biological meaning?
 
+## Run the maintained checks
+
+```bash
+# Offline numerical + historical-source SHA256 checks
+python workflows/verify.py
+
+# Full read-only local verification (needs existing frozen datasets and results)
+python workflows/verify.py --full
+```
+
+**[Active code and protected historical workflow](docs/ACTIVE_PIPELINE.md)** is
+the guide to what to edit, what to reuse, and what must remain frozen.
+The source-only tests also run in GitHub Actions; real frozen datasets remain
+local and are never uploaded by that workflow.
+
 ## Start here
 
 - [Current project status](docs/PROJECT_STATUS.md) — aims, evidence, unanswered questions.
