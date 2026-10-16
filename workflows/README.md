@@ -38,3 +38,25 @@ shared functions with regression tests. **Do not run the old scripts simply to
 satisfy a missing-file check; some involve large sequencing processes.**
 
 No existing research file has been moved or deleted.
+
+
+## Perturbation evidence chain
+
+```bash
+python workflows/perturbations.py --self-test
+python workflows/perturbations.py --show
+python workflows/perturbations.py --root . --check --include-optional
+```
+
+The second entry point covers the **frozen read-only contracts** for 09p
+(provisional multi-study response), 09r (additional studies and DATS
+quarantine), 09t (loading-to-response alignment), and 09u (robustness).
+The failed graph-predictor comparison 09s is retained as an **optional
+historical negative benchmark**, not part of the active scientific model.
+
+Both `clinical.py` and `perturbations.py` now reuse `_frozen.py`
+for file presence, optional SHA256 and frozen status validation. Status
+files ending in `.json` are read as JSON, while `.txt` status files
+are checked as exact strings.
+
+These scripts **do not run the generating audits or modify any datasets**.
