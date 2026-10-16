@@ -86,3 +86,59 @@ def check_stages(root: Path, stages: Sequence[Stage],
                      'depends': list(stage.depends), 'ok': not issues,
                      'issues': issues, 'checked': found})
     return rows
+
+
+def run_cli(stages: Sequence[Stage], title: str, caution: str,
+            self_test=None) -> int:
+    """Common command-line interface for the frozen clinical/evidence manifests."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description=title)
+    parser.add_argument('--root', type=Path,
+                        default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--show', action='store_true',
+                        help='Print dependency order without opening frozen data')
+    parser.add_argument('--check', action='store_true',
+                        help='Check local file and frozen status contracts (default)')
+    parser.add_argument('--include-optional', action='store_true',
+                        help='Also check historical/optional stages')
+    parser.add_argument('--hash', action='store_true',
+                        help='SHA256-hash verified files without modifying them')
+    parser.add_argument('--json', action='store_true',
+                        help='Return stage checks as machine-readable JSON')
+    parser.add_argument('--self-test', action='store_true',
+                        help='Test the checker using disposable synthetic fixtures')
+    args = parser.parse_args()
+
+    if args.self_test:
+        if self_test is None:
+            parser.error('no synthetic self-test available')
+        self_test()
+        return 0
+
+    if args.show:
+        validate_definition(stages)
+        for index, stage in enumerate(stages, 1):
+            suffix = ' (optional)' if stage.optional else ''
+            print(f'{index:02d}. {stage.key}: {stage.name}{suffix}')
+            print('    source:', stage.script)
+            print('    depends:', ', '.join(stage.depends) or 'none')
+        return 0
+
+    root = args.root.resolve()
+    rows = check_stages(root, stages, args.include_optional, args.hash)
+    if args.json:
+        print(json.dumps({'root': str(root), 'stages': rows}, indent=2))
+    else:
+        print(title)
+        print('Root:', root)
+        for row in rows:
+            print('[%s] %s: %s' %
+                  ('PASS' if row['ok'] else 'FAIL', row['key'], row['name']))
+            for issue in row['issues']:
+                print('    -', issue)
+        print('Checked stages: %s/%s PASS' %
+              (sum(row['ok'] for row in rows), len(rows)))
+        print(caution)
+        print('No frozen inputs, scientific outputs, or archived audits modified.')
+    return 0 if all(row['ok'] for row in rows) else 1
