@@ -79,3 +79,47 @@ def counts_to_logtpm(counts: object, gene_lengths_bp: object) -> np.ndarray:
         raise ValueError("TPM columns do not sum to 1e6")
     logged = np.log2(tpm + 1.0)
     return logged[:, 0] if c_vector else logged
+
+
+def calibrate_with_operator(operator: object, expression: object,
+                            slopes: object) -> np.ndarray:
+    """Use an already-frozen pseudoinverse; never refit it.
+
+    The caller supplies gene-order-aligned expression and component-order
+    slopes. Intercept cancellation is valid for *contrasts* only. This API
+    also supports the historical raw, uncentred 08g perturbation projection.
+    """
+    op = np.asarray(operator, dtype=float)
+    x = np.asarray(expression, dtype=float)
+    s = np.asarray(slopes, dtype=float)
+    if op.ndim != 2 or x.ndim not in (1, 2):
+        raise ValueError("operator must be 2D and expression 1D or 2D")
+    if x.shape[0] != op.shape[1]:
+        raise ValueError("gene order/size does not match frozen operator")
+    if s.ndim != 1 or len(s) != op.shape[0]:
+        raise ValueError("slopes must align to operator rows")
+    if not all(np.isfinite(value).all() for value in (op, x, s)):
+        raise ValueError("operator, expression and slopes must be finite")
+    raw = op @ x
+    return raw * (s if x.ndim == 1 else s[:, None])
+
+
+def project_residual(operator: object, expression_contrast: object,
+                     slopes: object, stable_indices: object,
+                     control_basis: object) -> np.ndarray:
+    """Frozen iModulon projection -> stable subset -> controlled residual.
+
+    Matches the two-stage formula in historic Phase 7/8 audits. Requires
+    caller-provided fixed loading/operator, programme order, frozen slopes,
+    stable indices, and already-normalised controlled-state basis.
+    """
+    activities = calibrate_with_operator(operator, expression_contrast, slopes)
+    indices = np.asarray(stable_indices)
+    if indices.ndim != 1 or indices.dtype.kind not in ("i", "u"):
+        raise ValueError("stable_indices must be a 1D integer index array")
+    if np.any(indices < 0) or np.any(indices >= activities.shape[0]):
+        raise ValueError("stable_indices out of range")
+    if len(set(indices.tolist())) != len(indices):
+        raise ValueError("duplicate stable programme indices")
+    stable = activities[indices]
+    return residualize_controls(stable, control_basis)
