@@ -1,0 +1,26 @@
+# Large research data and derived outputs
+/data/
+/results/
+/external/
+/references/
+/logs/
+/maintenance/
+/notes/
+
+# Python temporary files
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Local environments and secrets
+.env
+.env.*
+.venv/
+venv/
+*.pem
+*.key
+
+# System files
+.DS_Store
