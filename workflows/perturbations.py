@@ -2,12 +2,11 @@
 """Read-only Phase 9 perturbation evidence inventory and freeze checker."""
 from __future__ import annotations
 
-import argparse
 import json
 import tempfile
 from pathlib import Path
 
-from _frozen import Stage, check_stages, validate_definition
+from _frozen import Stage, check_stages, run_cli, validate_definition
 
 P9 = 'results/phase9/'
 STAGES = (
@@ -74,37 +73,12 @@ def self_test() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument('--show', action='store_true')
-    parser.add_argument('--check', action='store_true')
-    parser.add_argument('--include-optional', action='store_true')
-    parser.add_argument('--hash', action='store_true')
-    parser.add_argument('--json', action='store_true')
-    parser.add_argument('--self-test', action='store_true')
-    args = parser.parse_args()
-    if args.self_test:
-        self_test()
-        return 0
-    if args.show:
-        for index, stage in enumerate(STAGES, 1):
-            print(f'{index:02d}. {stage.key}: {stage.name}')
-            print('    source:', stage.script)
-            print('    depends:', ', '.join(stage.depends) or 'none')
-        return 0
-    rows = check_stages(args.root.resolve(), STAGES, args.include_optional, args.hash)
-    if args.json:
-        print(json.dumps({'root': str(args.root.resolve()), 'stages': rows}, indent=2))
-    else:
-        print('CF-STATE | FROZEN PERTURBATION EVIDENCE CHECK (READ ONLY)')
-        for row in rows:
-            print('[%s] %s: %s' % ('PASS' if row['ok'] else 'FAIL', row['key'], row['name']))
-            for issue in row['issues']:
-                print('    -', issue)
-        print('Checked stages: %s/%s PASS' % (sum(x['ok'] for x in rows), len(rows)))
-        print('Checks do not verify experimental independence or biological significance.')
-        print('No existing study files modified.')
-    return 0 if all(row['ok'] for row in rows) else 1
+    return run_cli(
+        STAGES,
+        'CF-STATE | FROZEN PERTURBATION EVIDENCE CHECK (READ ONLY)',
+        'Checks do not verify experimental independence or biological significance.',
+        self_test=self_test,
+    )
 
 
 if __name__ == '__main__':
