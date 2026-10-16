@@ -7,22 +7,11 @@ No historical audit is imported or executed. No scientific result is recomputed.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 
-
-@dataclass(frozen=True)
-class Stage:
-    key: str
-    name: str
-    script: str
-    files: tuple[str, ...]
-    status: tuple[str, str] | None = None
-    depends: tuple[str, ...] = ()
-    optional: bool = False
+from _frozen import Stage, check_stages, validate_definition as validate_stages
 
 
 P4 = 'results/phase4/'
@@ -78,57 +67,12 @@ STAGES = (
 )
 
 
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open('rb') as stream:
-        for piece in iter(lambda: stream.read(1024 * 1024), b''):
-            digest.update(piece)
-    return digest.hexdigest()
-
-
 def validate_definition() -> None:
-    names = [s.key for s in STAGES]
-    if len(set(names)) != len(names):
-        raise ValueError('Duplicate stage key')
-    previous = set()
-    for stage in STAGES:
-        if any(dep not in previous for dep in stage.depends):
-            raise ValueError('Stages are not in dependency order: ' + stage.key)
-        previous.add(stage.key)
+    validate_stages(STAGES)
 
 
 def check(root: Path, include_optional: bool = False, hashes: bool = False) -> list[dict]:
-    validate_definition()
-    results = []
-    for stage in STAGES:
-        if stage.optional and not include_optional:
-            continue
-        issues = []
-        found = []
-        for relative in (stage.script, *stage.files):
-            path = root / relative
-            if not path.is_file() or path.stat().st_size == 0:
-                issues.append('missing or empty: ' + relative)
-            else:
-                item = {'path': relative, 'bytes': path.stat().st_size}
-                if hashes:
-                    item['sha256'] = sha256(path)
-                found.append(item)
-        if stage.status:
-            rel, expected = stage.status
-            path = root / rel
-            if not path.is_file():
-                issues.append('missing status: ' + rel)
-            else:
-                actual = path.read_text(encoding='utf-8').strip()
-                if actual != expected:
-                    issues.append('unexpected status: ' + rel + ' (' + repr(actual) + ')')
-                elif hashes:
-                    found.append({'path': rel, 'sha256': sha256(path), 'bytes': path.stat().st_size})
-        results.append({'key': stage.key, 'name': stage.name,
-                        'depends': list(stage.depends), 'ok': not issues,
-                        'issues': issues, 'checked': found})
-    return results
+    return check_stages(root, STAGES, include_optional, hashes)
 
 
 def self_test() -> None:
