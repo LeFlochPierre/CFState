@@ -60,3 +60,35 @@ files ending in `.json` are read as JSON, while `.txt` status files
 are checked as exact strings.
 
 These scripts **do not run the generating audits or modify any datasets**.
+
+## Scientific functions (first extracted module)
+
+The `cfstate/imodulons.py` package now centralises three previously repeated
+numerical operations **without changing their formulas**:
+
+- `project_calibrated(M, expression_contrasts, slopes)`: frozen pseudoinverse
+  projection, then per-component slope calibration. Inputs must already be
+  position-aligned, and expression inputs are contrasts (intercepts cancel).
+- `residualize_controls(activities, B)`: same `np.linalg.lstsq(..., rcond=None)`
+  residualisation used by clinical and perturbation audits.
+- `counts_to_logtpm(counts, lengths_bp)`: 04k4 panel-specific gene-length
+  TPM normalisation, then log2(TPM+1). Never silently substitute softcore TPM
+  for full-gene TPM.
+
+Regression commands (from the project root):
+
+```bash
+python -m unittest discover -s tests -v
+OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python workflows/projection_regression.py --self-test
+OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python workflows/projection_regression.py --check
+```
+
+The real-data regression reads **the original frozen 04k4 inputs** and independently
+recalculates the published 108-programme × 13-sample Atlanta primary reference
+activity matrix. It checks it against
+`FROZEN_108_activities__FROZEN_5567_TPM__PRIMARY_CFBE_ALL4.csv`.
+It refuses discrepancies greater than the specified numerical tolerance.
+
+Historical source scripts are intentionally unchanged in this first extraction;
+their outputs provide the regression ground truth. We will only replace their
+internal duplicated calculations once the real-data check passes.
