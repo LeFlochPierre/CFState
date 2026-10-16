@@ -81,8 +81,12 @@ def check(root: Path, expect_real: bool = True) -> tuple[float, int, int]:
         fail('mask does not identify unique frozen M genes')
     if not set(mask).issubset(atl.index) or not set(mask).issubset(ref.index):
         fail('expression missing masked genes')
-    if not set(m.columns).issubset(cal.index) or not set(stable).issubset(m.columns):
-        fail('calibration/stable labels do not match frozen M')
+    missing_cal = sorted(set(m.columns) - set(cal.index))
+    missing_stable = sorted(set(stable) - set(m.columns))
+    if missing_cal or missing_stable:
+        fail('calibration/stable labels do not match frozen M: '
+             + 'missing calibration=' + repr(missing_cal)
+             + '; missing stable=' + repr(missing_stable))
     if 'calibration_slope' not in cal or 'PRIMARY_CFBE_ALL4' not in ref:
         fail('missing calibration slope or primary CFBE reference')
     if set(expected.columns) != set(atl.columns):
@@ -129,7 +133,10 @@ def self_test() -> None:
         expected = ((np.linalg.pinv(m.loc[mask].to_numpy()) @ contrast) * slopes.to_numpy()[:, None])
         frozen = pd.DataFrame(expected, index=m.columns, columns=samples).loc[stable]
         contents = {
-            'model': json.dumps({'M':m.to_json()}),
+            # Use explicit labelled columns to avoid pandas-version-dependent
+            # nested JSON dtype/orientation inference in synthetic fixtures.
+            # Real frozen JSON still exercises its original string-M parser.
+            'model': json.dumps({'M':m.to_dict()}),
         }
         for key, rel in FILES.items():
             path = root / rel
